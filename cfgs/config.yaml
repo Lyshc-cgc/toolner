@@ -1,0 +1,14 @@
+
+num_initial_entities: 5
+num_sentences_per_entity: 3
+cache_dir: data/anno_res/{annotator}/{dataset}_{seed}  # cache directory to save annotation.py results
+eval_dir: data/eval/{annotator}/{dataset}_{seed}  # evaluation results file dir
+des_format: simple  # type description format , 'simple' for simple description, 'full' for full description, 'empty' for no description
+natural_form: True  # natural_form is used to indicate whether the labels are in natural language form.
+generate_method: fixed
+dataset: conll2003  # the dataset to annotate. conll2003, ontonotes5, mit_movies, mit_restaurant
+
+# api config
+#api_cfg: cfgs/api.yml
+# annotators config
+annotator: qwen2.5  # qwen2.5, ds-v2
