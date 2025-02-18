@@ -1,47 +1,93 @@
+import re
 import os
 import json
+import random
+from module import func_util as fu
+from module.label import Label
 
-class NERDemoGenerator:
+logger = fu.get_logger('NERDemoGeneratorOffline')
+
+class NERDemoGeneratorOffline(Label):
     def __init__(self, annotator, config):
+        super().__init__(config.dataset, config.natural_form)
         self.config = config
         self.annotator = annotator
-
+        entity_types = list(self.label2id.keys())
+        if 'O' in entity_types:
+            entity_types.remove('O')
+        self.entity_types = entity_types
         # initialize entity list
-        self.entity_list = {entity_type: [] for entity_type in self.config['entity_types']}
+        self.entity_list = {entity_type: [] for entity_type in entity_types}
 
     def generate_initial_entities(self):
         init_entities_file = os.path.join(self.config.cache_dir, 'initial_entities.json')
         if os.path.exists(init_entities_file):
-            with open(init_entities_file, "r", encoding="utf-8") as f:
-                self.entity_list = json.load(f)
-            logger(f"Cached initial entities found! Load initial entities from {init_entities_file}")
-            return
+            try:
+                with open(init_entities_file, "r", encoding="utf-8") as f:
+                    self.entity_list = json.load(f)
+                logger.info(f"Cached initial entities found! Load initial entities from {init_entities_file}")
+                return
+            except Exception as e:
+                logger.error(f"Error during loading initial entities: {e}")
 
         # no cached file. generate initial entities from scratch
-        for entity_type in self.config['entity_types']:
-            initial_entities = self._generate_entities(entity_type, self.config['num_initial_entities'])
+        for entity_type in self.entity_types:
+            initial_entities = self._generate_entities(entity_type, self.config.k_shot)
             self.entity_list[entity_type].extend(initial_entities)
-        logger.info("Initial Entity List:")
+        logger.info(":Initial Entity List")
         logger.info(self.entity_list)
 
         # save initial entities to file
         try:
             with open(init_entities_file, "w", encoding="utf-8") as f:
-                json.dump(self.entity_list, init_entities_file, ensure_ascii=False, indent=4)
+                json.dump(self.entity_list, f, ensure_ascii=False, indent=4)
             print(f"Save initial entities to {init_entities_file}")
         except Exception as e:
             print(f"Error during saving initial entities: {e}")
 
+    def _get_type_description(self, entity_type):
+        """
+        get the description of the entity type
+        :param entity_type:
+        :return:
+        """
+        type_description = ''
+        if self.config.des_format == '' or self.config.des_format == 'empty':
+            return type_description
+
+        type_description = self.label_description[entity_type]  # full description
+        if self.config.des_format == 'simple':
+            type_description = type_description.split('.')[:2]
+            type_description = ' '.join(type_description)
+
+        return type_description
+
     def _generate_entities(self, entity_type, num_entities):
+        def _extract_entity(sentence):
+            pattern = re.compile(r"\*\*(.*?)\*\*")
+            matches = re.findall(pattern, sentence)
+            if len(matches) == 0:
+                return None
+            random.shuffle(matches)  # random shuffle to avoid the same or common entities
+            return matches[:num_entities]
+
+        type_description = self._get_type_description(entity_type)
         prompt = [
             {"role": "system", "content": "You are a helpful assistant"},
             # todo，是否添加解释，做消融实验
+
             {"role": "user",
-             "content": f"Generate {num_entities} examples of {entity_type} entities. Separate with commas (,)."}
+             "content": f"Directly generate {num_entities + 3} famous {entity_type} named entities.\n"  # 3 more entities for backup
+                        f"{type_description}\n"
+                        f"You should know that: \n"
+                        f"1. all named entities need to be surrounded by '**' (before and after).\n"
+                        f"2. we only need named entities. please do not include any other information"
+             }
         ]
-        outputs = self.annotator.chat(conversation=prompt, sampling_params=self.annotator.sampling_params,
-                                      use_tqdm=True)
-        generated_entities = outputs[0].outputs[0].text.split(",")
+        outputs = self.annotator.llm.chat(messages=prompt, sampling_params=self.annotator.sampling_params, use_tqdm=True)
+        # logger.info(f'prompt: \n{outputs[0].prompt}')
+        # logger.info(f'output: \n{outputs[0].outputs[0].text}')
+        generated_entities = _extract_entity(outputs[0].outputs[0].text)
         return [entity.strip() for entity in generated_entities]
 
     def generate_demos_fixed_one(self):
@@ -73,10 +119,10 @@ class NERDemoGenerator:
         prompt = [
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user",
-             "content": f"Create a sentence containing '{entity_mention}', which is an entity of type '{entity_type}'."}
+             "content": f"Create a sentence containing '{entity_mention}', which is an entity of type '{entity_type}'. \n"
+                        f"Please do not reveal the type of entity in the sentence"}
         ]
-        outputs = self.annotator.chat(conversation=prompt, sampling_params=self.annotator.sampling_params,
-                                      use_tqdm=False)
+        outputs = self.annotator.llm.chat(messages=prompt, sampling_params=self.annotator.sampling_params, use_tqdm=False)
         return outputs[0].outputs[0].text
 
     def _diversify_entity(self, sentence, entity_type):
@@ -85,19 +131,12 @@ class NERDemoGenerator:
             {"role": "user",
              "content": f"Replace the entity in the following sentence with a new entity of type {entity_type}: {sentence}"}
         ]
-        outputs = self.annotator.chat(conversation=prompt, sampling_params=self.annotator.sampling_params,
-                                      use_tqdm=False)
+        outputs = self.annotator.llm.chat(messages=prompt, sampling_params=self.annotator.sampling_params, use_tqdm=False)
         return outputs[0].outputs[0].text
 
-    def _extract_entity(self, sentence, entity_type):
-        pattern = re.compile(rf"<{entity_type}>\('([^']+)'\)")
-        match = pattern.search(sentence)
-        if match:
-            return match.group(1)
-        return None
 
     def generate_demonstrations(self, generate_method="fixed"):
-        demonstrations_file = os.path.join(self.config.cache_dir, 'demonstrations.json')
+        demonstrations_file = os.path.join(self.config.cache_dir, f'{generate_method}_demonstrations.json')
         if os.path.exists(demonstrations_file):
             with open(demonstrations_file, "r", encoding="utf-8") as f:
                 demonstrations = json.load(f)
@@ -128,29 +167,20 @@ class NERDemoGenerator:
             return template
 
         # no cached file. generate template from scratch
-        self.generate_initial_entities()  # step1, generate initial entities
-        demonstrations = self.generate_demonstrations(self.config.generate_method)  # step2, generate demonstrations
+        # step1, generate initial entities
+        self.generate_initial_entities()
 
+        # step2, generate demonstrations
+        demonstrations = self.generate_demonstrations(self.config.generate_method)
+        demonstrations_str = ''
+        for idx, demon in enumerate(demonstrations):
+            demonstrations_str += f'{idx + 1})\n {demon} \n'
         # get type information
         types_information = ''
-        for label_id, label_info in enumerate(self.config.dataset.labels):
-            if self.config.natural_form == 'natural':  # use natual format
-                type_string = label_info['natural']
-            else:
-                type_string = label_info.keys()[0]
+        for idx, (type_str, type_description) in enumerate(self.label_description.items()):
 
-            if self.config.des_format == 'empty':  # don't show the description of the types
-                description = ''
-            else:
-                if self.config.des_format == 'simple':  # use simple description
-                    description = label_info['description'].split('.')[:2]  # only show the first two sentences
-                    description = ' '.join(description)
-                else:  # use full description
-                    description = label_info['description']
-
-                description = type_string + ' ' + description
-            types_information += '{idx}) {type}\n {description}\n'.format(idx=label_id + 1, type=type_string,
-                                                                          description=description)
+            description = self._get_type_description(type_str)
+            types_information += '{idx}) {type}\n {description}\n'.format(idx=idx + 1, type=type_str, description=description)
 
         prompt = f"""
         You are a professional and helpful crowdsourcing data annotator using English.
@@ -166,8 +196,8 @@ class NERDemoGenerator:
 
         Here are some demonstrations to help you understand the task better:
         ### Demonstrations
-        {demonstrations}
-
+        {demonstrations_str}
+    
         """
 
         try:
