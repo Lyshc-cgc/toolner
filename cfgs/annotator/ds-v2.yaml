@@ -6,7 +6,7 @@ checkpoint: model/deepseek-ai/DeepSeek-V2-Lite-Chat  # your path to the model ch
 # https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat
 anno_temperature: 0.5  # temperature for this model.
 anno_top_p: 0.8  # top_p for this model. The smaller the value, the more deterministic the model output is.
-anno_max_tokens: 100  # maximum number of tokens to generate per output sequence.
+anno_max_tokens: 200  # maximum number of tokens to generate per output sequence.
 repetition_penalty: 1  # set to 1 to avoid repetition penalty
 anno_bs: 5  # batch size for this model
 dtype: half  # https://docs.vllm.ai/en/latest/models/engine_args.html#cmdoption-dtype
@@ -14,3 +14,7 @@ gpu_memory_utilization: 0.7
 stream: False  # if True, the model will be used in stream mode. This is useful for chat models.
 tensor_parallel_size: 2
 enable_chunked_prefill: False  # https://github.com/vllm-project/vllm/issues/6723, set explicitly enable_chunked_prefill to False For Volta GPU
+# https://docs.vllm.ai/en/stable/serving/engine_args.html and
+# https://github.com/vllm-project/vllm/issues/2418
+# prevent the model from running out of memory
+max_model_len: 8196  # 10244

@@ -23,29 +23,9 @@ def set_seed(seed: int = 22):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-def get_logger(name, level=logging.INFO, filename='test.log'):
+def get_logger(name, level=logging.INFO):
+    logging.basicConfig(level=level, format='[%(asctime)s | %(levelname)s | %(name)s | %(filename)s:%(lineno)d ] -- %(message)s')
     logger = logging.getLogger(name)
-    logger.setLevel(level)
-
-    # remove redundant handler
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-
-    # file handler to store log
-    file_handler = logging.FileHandler(filename)
-    file_handler.setLevel(level)
-
-    # console handler to print log
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-
-    # format
-    formatter = logging.Formatter('[%(asctime)s | %(levelname)s | %(name)s | %(filename)s:%(lineno)d ] -- %(message)s')
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
     return logger
 
 def get_config(cfg_file):

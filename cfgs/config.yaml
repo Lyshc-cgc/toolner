@@ -1,14 +1,36 @@
-
-num_initial_entities: 5
-num_sentences_per_entity: 3
-cache_dir: data/anno_res/{annotator}/{dataset}_{seed}  # cache directory to save annotation.py results
-eval_dir: data/eval/{annotator}/{dataset}_{seed}  # evaluation results file dir
+online: True  # online mode or offline mode
+k_shot: 1   # 5. it indicates the number of initial entities for each type
+seed: 22
+cache_dir: data/anno_res/{entity_app}/{dataset}_{k_shot}-shot_{seed}  # cache directory to save annotation.py results
+eval_dir: data/eval/{entity_app}/{dataset}_{k_shot}-shot_{seed}  # evaluation results file dir
 des_format: simple  # type description format , 'simple' for simple description, 'full' for full description, 'empty' for no description
 natural_form: True  # natural_form is used to indicate whether the labels are in natural language form.
-generate_method: fixed
-dataset: conll2003  # the dataset to annotate. conll2003, ontonotes5, mit_movies, mit_restaurant
+generate_method: combined  # fixed, combined
+max_entities: 3  # max number of entities in a sentence
 
-# api config
-#api_cfg: cfgs/api.yml
-# annotators config
-annotator: qwen2.5  # qwen2.5, ds-v2
+dataset: ???  # the dataset cfg. it's need to be set in 'run.py'
+data_cfg_paths:
+  conll2003: cfgs/dataset/conll2003.yaml  # relative to the 'run.py' file
+  ontonotes5: cfgs/dataset/ontonotes5.yaml
+  mit_restaurant: cfgs/dataset/mit_restaurant.yaml
+  mit_movies: cfgs/dataset/mit_movie.yaml
+#  genia: cfgs/dataset/genia.yml
+
+# dify_cfg:
+entity_app:
+  name: tool_agent  # app to generate entities, 'intrinsic' (other), 'tool_agent' (agent)
+  app_mode: other
+sentence_app:
+  name: sentence_model  # app to generate sentences
+
+dify_cfg:
+  base_url: http://localhost/v1
+  intrinsic: app-IW8uh8lopyvzAWFUeTf7RzK4  # intrinsic entity generation app token
+  tool_agent: app-OE8Ejn9NUPovAnZ3O3fUW2oL # tool entity generation app token
+  ner_model: app-SDS5uCmqmcLLm5wOilhLyedm  # ner model app token
+  sentence_model: app-Xd5u8MT4ragS3G14IquHEv7W  # sentence model(to generate sentence)app token
+
+defaults:
+  - _self_
+#  - dataset: conll2003  # the dataset to annotate. conll2003, ontonotes5, mit_movies, mit_restaurant
+  - annotator: qwen2.5 # qwen2.5, ds-v2

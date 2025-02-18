@@ -14,6 +14,7 @@ class Label:
         self.raw_bio = labels_cfg['raw_bio']  # a flag to indicate whether the labels are in BIO format in the raw dataset.
         self.label2id = dict()
         self.id2label = dict()
+        self.label_description = dict()
         self.covert_tag2id = dict() if self.raw_bio else None  # covert the original BIO label (tag) id to the new label id. e.g., {2:2,3:2} means 2 (B-DATE) and 3 (I-DATE) are the same (DATE, id=2).
         if natural_form:  # use natural-language-form labels
             self.init_natural_labels()
@@ -35,6 +36,7 @@ class Label:
             if label not in self.label2id.keys():
                 self.label2id[label] = idx
                 self.id2label[idx] = label
+                self.label_description[label] = label + ' ' +  self.labels[label]['description']
                 idx += 1
 
             # if the labels are not in BIO format in the raw datasets, there is no need to covert the
@@ -56,6 +58,7 @@ class Label:
             id = index + 1
             self.label2id[label] = id
             self.id2label[id] = label
+            self.label_description[label] = label + ' ' +  v['description']
 
         # if the labels are not in BIO format in the raw datasets, there is no need to covert the
         # original BIO label (tag) id to the new label id.

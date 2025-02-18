@@ -1,6 +1,5 @@
 import os
 from openai import OpenAI
-from vllm import LLM, SamplingParams
 from module import func_util as fu
 
 logger = fu.get_logger('Annotator')
@@ -18,11 +17,6 @@ class Annotator:
         self.annotator_cfg = annotator_cfg
         self.api_cfg = api_cfg if api_cfg else None
 
-        # 1. GPU setting
-        os.environ['TOKENIZERS_PARALLELISM'] = 'false'  # avoid parallelism in tokenizers
-        cuda_devices = [str(i) for i in range(annotator_cfg['tensor_parallel_size'])]
-        os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(cuda_devices)
-
         # 2. Init the annotating model
         if not just_test:
             logger.info('----- Init LLM -----')
@@ -33,16 +27,25 @@ class Annotator:
                     max_retries=3,
                 )
             else:
+                from vllm import LLM, SamplingParams
+                # 1. GPU setting
+                os.environ['TOKENIZERS_PARALLELISM'] = 'false'  # avoid parallelism in tokenizers
+                cuda_devices = [str(i) for i in range(annotator_cfg['tensor_parallel_size'])]
+                os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(cuda_devices)
+
                 # if not use api, we employ local annotator using vllm
                 # https://docs.vllm.ai/en/latest/getting_started/quickstart.html
-                self.llm = LLM(model=annotator_cfg['checkpoint'],
-                                      tensor_parallel_size=annotator_cfg['tensor_parallel_size'],
-                                      dtype=annotator_cfg['dtype'],
-                                      gpu_memory_utilization=annotator_cfg['gpu_memory_utilization'],
-                                      trust_remote_code=True,
-                                      # https://github.com/vllm-project/vllm/issues/6723
-                                      # set explicitly enable_chunked_prefill to False For Volta GPU
-                                      enable_chunked_prefill=False)
+                self.llm = LLM(
+                    model=annotator_cfg['checkpoint'],
+                    tensor_parallel_size=annotator_cfg['tensor_parallel_size'],
+                    dtype=annotator_cfg['dtype'],
+                    gpu_memory_utilization=annotator_cfg['gpu_memory_utilization'],
+                    trust_remote_code=True,
+                    # https://github.com/vllm-project/vllm/issues/6723
+                    # set explicitly enable_chunked_prefill to False For Volta GPU
+                    enable_chunked_prefill=False,
+                    max_model_len=annotator_cfg['max_model_len'],
+                    )
                 self.sampling_params = SamplingParams(temperature=annotator_cfg['anno_temperature'],
                                                       top_p=annotator_cfg['anno_top_p'],
                                                       max_tokens=annotator_cfg['anno_max_tokens'],
@@ -51,4 +54,4 @@ class Annotator:
                 # get anno_model's tokenizer to apply the chat template
                 # https://github.com/vllm-project/vllm/issues/3119
                 # anno_tokenizer = anno_model.llm_engine.tokenizer.tokenizer
-                self.anno_tokenizer = self.llm.get_tokenizer()
+                self.tokenizer = self.llm.get_tokenizer()

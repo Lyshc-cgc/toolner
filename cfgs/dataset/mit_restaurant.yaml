@@ -37,7 +37,7 @@ labels:
   Hours:
     natural: Hours
     description: >-
-      indicates "Hours". The opening hours of the restaurant.
+      indicates "Hours". The opening time of the restaurant.
   Dish:
     natural: Dish
     description: >-
