@@ -4,6 +4,8 @@ import re
 import yaml
 import itertools
 import logging
+import requests
+import json
 import pandas as pd
 import numpy as np
 from collections import Counter
@@ -122,26 +124,29 @@ def compute_span_f1_by_labels(gold_spans, pred_spans, id2label, res_file):
 
     label_record = {}
     for lb in id2label.values():
-        if lb == 'O':  # do not consider the 'O' label
-            continue
+        # Label 'O', representing an instance without any entities
         label_record[lb] = {"Label": lb, "Gold count": 0, "Gold rate": 0, "Pred count": 0, "Pred rate": 0,
                            "TP": 0, "FP": 0, "FN": 0, "P": 0, "R": 0, "F1": 0}
 
     for gold_span in gold_spans:
-        label_id = int(gold_span[-1])  # shape like (start, end, span, label)
-        label = id2label[label_id]
+        if len(gold_span) == 0:
+            # Label 'O', representing an instance without any entities
+            label_record['O']["Gold count"] += 1
+            continue
+        label = gold_span[-1]  # shape like (start, end, span, label)
         label_record[label]["Gold count"] += 1
 
     ood_type_preds = []
     ood_mention_preds = []
     for pred_span in tqdm(pred_spans, desc="compute metric"):
-        mention, label_id = pred_span[-2], pred_span[-1]  # shape like (start, end, mention span, label)
-        label_id = int(label_id)  # shape like (start, end, span, label)
-        label = id2label[label_id]
-        # ood type
-        if label not in id2label.values():
-            ood_type_preds.append({label: mention})
-            continue
+        if len(pred_span) == 0:
+            label = 'O'
+        else:
+            mention, label = pred_span[-2], pred_span[-1]  # shape like (start, end, mention span, label)
+            # ood type
+            if label not in id2label.values():
+                ood_type_preds.append({label: mention})
+                continue
         label_record[label]["Pred count"] += 1
         # ood mention,
         # if tmp_mention not in item["sentence"]:
@@ -304,3 +309,103 @@ def remove_duplicated_label_sets(label_sets: list):
     label_sets = [label_sets[i] for i in range(len(label_sets)) if i not in duplicated_id]
     return label_sets
 
+def request_dify_chat(base_url,
+                      token,
+                      query,
+                      inputs={},
+                      response_mode="streaming",
+                      app_mode='other'
+                      ):
+    """
+    Request to Dify Chat API
+
+    :param base_url: dify api base url
+    :param token: token for the request
+    :param query: user query
+    :param inputs: a dict, input key-value pairs
+    :param response_mode: response mode, 'streaming' or 'blocking'
+    :param app_mode: application mode, 'agent', 'other'
+    :return:
+    """
+    assert response_mode in {'streaming', 'blocking'}, f"response_mode should be 'streaming' or 'blocking', but got {response_mode}"
+    if app_mode == 'agent':
+        response_mode = 'streaming'
+    assert app_mode in {'agent', 'other', 'chat'}, f"app_mode should be 'agent', 'other' or 'chat', but got {app_mode}"
+    url = f'{base_url}/chat-messages'
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        "inputs": inputs,
+        "query": query,
+        "response_mode": response_mode,
+        "conversation_id": "",
+        "user": "abc-123",
+        # "files": [
+        #     {
+        #         "type": "image",
+        #         "transfer_method": "remote_url",
+        #         "url": "https://cloud.dify.ai/logo/logo-site.png"
+        #     }
+        # ]
+    }
+    stream_flag = True if response_mode == "streaming" else False
+    response = requests.post(url, headers=headers, json=data, stream=stream_flag)
+    chunks = response.text.split('\n\n')
+    resp_message = ''
+    event_type = 'agent_message' if app_mode == 'agent' else 'message'
+    for chunk in chunks:
+        try:
+            chunk_json = json.loads(chunk[5:])  # remove the first 5 characters
+        except Exception as e:
+            continue
+        if chunk_json['event'] == event_type:
+            resp_message += chunk_json['answer'] + '\n'
+    return resp_message
+
+def request_dify_completion(base_url,
+                            inputs,
+                            token,
+                            response_mode="streaming"
+                            ):
+    """
+    Request to Dify Completion API
+
+    :param base_url: dify api base url
+    :param inputs: a dict, input key-value pairs
+    :param token: token for the request
+    :param response_mode: response mode, 'streaming' or 'blocking'
+    :return:
+    """
+    assert response_mode in {'streaming', 'blocking'}, f"response_mode should be 'streaming' or 'blocking', but got {response_mode}"
+    url = f'{base_url}/completion-messages'
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+    assert 'query' in inputs, "inputs should contain 'query' key"
+    assert inputs['query'] != '', "query should not be empty!"
+
+    data = {
+        "inputs": inputs,
+        "response_mode": response_mode,
+        "user": "abc-123",
+    }
+    stream_flag = True if response_mode == "streaming" else False
+    response = requests.post(url, headers=headers, json=data, stream=stream_flag)
+    chunks = response.text.split('\n\n')
+    resp_message = ''
+    for chunk in chunks:
+        try:
+            chunk_json = json.loads(chunk[5:])  # remove the first 5 characters
+        except Exception as e:
+            continue
+        if chunk_json['event'] == 'message':
+            resp_message += chunk_json['answer'] + '\n'
+    return resp_message
+
+def clean_format(message):
+    message = re.sub(r'\n', '', message)
+    message = re.sub(r"\s+", " ", message)
+    return message

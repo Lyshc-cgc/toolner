@@ -3,13 +3,12 @@ import re
 import os
 import json
 import random
-import requests
 from module import func_util as fu
 from module.label import Label
 
-logger = fu.get_logger('NERDemoGeneratorOnline')
+logger = fu.get_logger('NERDemoGenerator')
 
-class NERDemoGeneratorOnline(Label):
+class NERDemoGenerator(Label):
     def __init__(self, config):
         super().__init__(config.dataset, config.natural_form)
         self.config = config
@@ -19,108 +18,6 @@ class NERDemoGeneratorOnline(Label):
         self.entity_types = entity_types
         # initialize entity list
         self.entity_list = {entity_type: [] for entity_type in entity_types}
-
-    @staticmethod
-    def _clean_format(message):
-        message = re.sub(r'\n', '', message)
-        message = re.sub(r"\s+", " ", message)
-        return message
-
-    def _request_dify_chat(self,
-                           base_url,
-                           request_app,
-                           query,
-                           inputs={},
-                           response_mode="streaming",
-                           app_mode='other'):
-        """
-        Request to Dify Chat API
-
-        :param base_url: dify api base url
-        :param request_app: request application
-        :param query: user query
-        :param inputs: a dict, input key-value pairs
-        :param response_mode: response mode, 'streaming' or 'blocking'
-        :param app_mode: application mode, 'agent', 'other'
-        :return:
-        """
-        assert response_mode in {'streaming', 'blocking'}, f"response_mode should be 'streaming' or 'blocking', but got {response_mode}"
-        if app_mode == 'agent':
-            response_mode = 'streaming'
-        assert app_mode in {'agent', 'other'}, f"app_mode should be 'agent' or 'other', but got {app_mode}"
-        url = f'{base_url}/chat-messages'
-        headers = {
-            'Authorization': f'Bearer {self.config.dify_cfg[request_app]}',
-            'Content-Type': 'application/json'
-        }
-        data = {
-            "inputs": inputs,
-            "query": query,
-            "response_mode": response_mode,
-            "conversation_id": "",
-            "user": "abc-123",
-            # "files": [
-            #     {
-            #         "type": "image",
-            #         "transfer_method": "remote_url",
-            #         "url": "https://cloud.dify.ai/logo/logo-site.png"
-            #     }
-            # ]
-        }
-        stream_flag = True if response_mode == "streaming" else False
-        response = requests.post(url, headers=headers, json=data, stream=stream_flag)
-        chunks = response.text.split('\n\n')
-        resp_message = ''
-        event_type = 'agent_message' if app_mode == 'agent' else 'message'
-        for chunk in chunks:
-            try:
-                chunk_json = json.loads(chunk[5:])  # remove the first 5 characters
-            except Exception as e:
-                continue
-            if chunk_json['event'] == event_type:
-                resp_message += chunk_json['answer'] + '\n'
-        return resp_message
-
-    def _request_dify_completion(self,
-                                 base_url,
-                                 inputs,
-                                 request_app='sentence_model',
-                                 response_mode="streaming"):
-        """
-        Request to Dify Completion API
-
-        :param base_url: dify api base url
-        :param inputs: a dict, input key-value pairs
-        :param response_mode: response mode, 'streaming' or 'blocking'
-        :return:
-        """
-        assert response_mode in {'streaming', 'blocking'}, f"response_mode should be 'streaming' or 'blocking', but got {response_mode}"
-        url = f'{base_url}/completion-messages'
-        headers = {
-            'Authorization': f'Bearer {self.config.dify_cfg[request_app]}',
-            'Content-Type': 'application/json'
-        }
-        assert 'query' in inputs, "inputs should contain 'query' key"
-        assert inputs['query'] != '', "query should not be empty!"
-
-        data = {
-            "inputs": inputs,
-            "response_mode": response_mode,
-            "user": "abc-123",
-        }
-        stream_flag = True if response_mode == "streaming" else False
-        response = requests.post(url, headers=headers, json=data, stream=stream_flag)
-        chunks = response.text.split('\n\n')
-        resp_message = ''
-        for chunk in chunks:
-            try:
-                chunk_json = json.loads(chunk[5:])  # remove the first 5 characters
-            except Exception as e:
-                continue
-            if chunk_json['event'] == 'message':
-                resp_message += chunk_json['answer'] + '\n'
-        return resp_message
-
 
     def generate_initial_entities(self):
         init_entities_file = os.path.join(self.config.cache_dir, 'initial_entities.json')
@@ -184,16 +81,16 @@ class NERDemoGeneratorOnline(Label):
 
         generated_entities = None
         while generated_entities is None:
-            res_message= self._request_dify_chat(
-                base_url=self.config.dify_cfg.base_url,
-                request_app=self.config.entity_app.name,
+            res_message= fu.request_dify_chat(
+                base_url=self.config.dify_api.base_url,
+                token=self.config.dify_api[self.config.entity_app.name],
                 query=query,
                 inputs=inputs,
                 response_mode="streaming",
                 app_mode=self.config.entity_app.app_mode
             )
 
-            res_message = self._clean_format(res_message)
+            res_message = fu.clean_format(res_message)
             generated_entities = _extract_entity(res_message)
         return [entity.strip() for entity in generated_entities]
 
@@ -208,13 +105,13 @@ class NERDemoGeneratorOnline(Label):
                      f"Please do not reveal the type of entity in the sentence")
             inputs = {'query': query}
 
-            res_message = self._request_dify_completion(
-                base_url=self.config.dify_cfg.base_url,
+            res_message = fu.request_dify_completion(
+                base_url=self.config.dify_api.base_url,
                 inputs=inputs,
-                request_app=self.config.sentence_app.name,
+                token=self.config.dify_api[self.config.sentence_app.name],
                 response_mode="streaming",
             )
-            sentence = self._clean_format(res_message)
+            sentence = fu.clean_format(res_message)
             return sentence
         demonstrations = []
         for entity_type, entities in self.entity_list.items():
@@ -258,13 +155,13 @@ class NERDemoGeneratorOnline(Label):
                      f"Please do not reveal the type of entity in the sentence")
             inputs = {'query': query}
 
-            res_message = self._request_dify_completion(
-                base_url=self.config.dify_cfg.base_url,
+            res_message = fu.request_dify_completion(
+                base_url=self.config.dify_api.base_url,
                 inputs=inputs,
-                request_app=self.config.sentence_app.name,
+                token=self.config.dify_api[self.config.sentence_app.name],
                 response_mode="streaming",
             )
-            sentence = self._clean_format(res_message)
+            sentence = fu.clean_format(res_message)
             return sentence
 
         def _get_entity_combinations(original_entity_list: dict):
@@ -311,17 +208,28 @@ class NERDemoGeneratorOnline(Label):
         return demonstrations
 
 
-    def _diversify_entity(self, sentence, entity_type):
-        prompt = [
-            {"role": "system", "content": "You are a helpful assistant"},
-            {"role": "user",
-             "content": f"Replace the entity in the following sentence with a new entity of type {entity_type}: {sentence}"}
-        ]
-        outputs = self.annotator.llm.chat(messages=prompt, sampling_params=self.annotator.sampling_params,
-                                          use_tqdm=False)
-        return outputs[0].outputs[0].text
+    # def _diversify_entity(self, sentence, entity_type):
+    #     prompt = [
+    #         {"role": "system", "content": "You are a helpful assistant"},
+    #         {"role": "user",
+    #          "content": f"Replace the entity in the following sentence with a new entity of type {entity_type}: {sentence}"}
+    #     ]
+    #     outputs = self.annotator.llm.chat(messages=prompt, sampling_params=self.annotator.sampling_params,
+    #                                       use_tqdm=False)
+    #     return outputs[0].outputs[0].text
 
     def generate_demonstrations(self, generate_method="fixed"):
+        """
+        Generate demonstrations
+        :param generate_method: the method to generate sentence of demonstrations
+        :return:
+        """
+        sentence_generate_methods = {
+            "fixed": self.generate_demos_fixed_one,
+            "combined": self.generate_demos_combined
+        }
+        assert generate_method in sentence_generate_methods, f"generate_method should be in {sentence_generate_methods.keys()}"
+
         demonstrations_file = os.path.join(self.config.cache_dir, f'{generate_method}_demonstrations.json')
         if os.path.exists(demonstrations_file):
             with open(demonstrations_file, "r", encoding="utf-8") as f:
@@ -329,10 +237,6 @@ class NERDemoGeneratorOnline(Label):
             logger.info(f"Cached demonstrations found! Load demonstrations from {demonstrations_file}")
             return demonstrations
 
-        sentence_generate_methods = {
-            "fixed": self.generate_demos_fixed_one,
-            "combined": self.generate_demos_combined
-        }
         # no cached file. generate demonstrations from scratch
         demonstrations = sentence_generate_methods[generate_method]()
 
@@ -345,36 +249,43 @@ class NERDemoGeneratorOnline(Label):
             logger.error(f"Error during saving demonstrations: {e}")
         return demonstrations
 
-    def get_prompt(self, ):
-        chat_template_file = os.path.join(self.config.cache_dir, f'{self.config.generate_method}_template.txt')
-        if os.path.exists(chat_template_file):
-            with open(chat_template_file, "r", encoding="utf-8") as f:
-                template = f.read()
-            logger.info(f"Cached template found! Load template from {chat_template_file}")
-            return template
-
-        # no cached file. generate template from scratch
+    def get_prompt(self):
+        """
+        Get the prompt for the user
+        :return:
+        """
         # step1, generate initial entities
         self.generate_initial_entities()
 
         # step2, generate demonstrations
         demonstrations = self.generate_demonstrations(self.config.generate_method)
+        # todo, 这里可以加入lsp方法，
         demonstrations_str = ''
         for idx, demon in enumerate(demonstrations):
             demonstrations_str += f'{idx + 1})\n {demon} \n'
+
         # get type information
         types_information = ''
         for idx, (type_str, type_description) in enumerate(self.label_description.items()):
             description = self._get_type_description(type_str)
-            types_information += '{idx}) {type}\n {description}\n'.format(idx=idx + 1, type=type_str,
-                                                                          description=description)
+            types_information += '{idx}) {type}\n {description}\n'.format(idx=idx + 1, type=type_str, description=description)
 
+        # step3, get the prompt
+        chat_template_file = os.path.join(self.config.cache_dir, f'{self.config.generate_method}_template.txt')
+        if os.path.exists(chat_template_file):
+            with open(chat_template_file, "r", encoding="utf-8") as f:
+                prompt = f.read()
+            logger.info(f"Cached template found! Load template from {chat_template_file}")
+            return prompt, types_information, demonstrations_str
+
+        # no cached file. generate template from scratch
         prompt = f"""
+        ### Role
         You are a professional and helpful crowdsourcing data annotator using English.
 
         Here is your task:
         ### Task
-        Identify the entities and recognize their types in the sentence.
+        Identify the entities and recognize their types in the user's query.
         The output should be a string in the format of the tuple list,  like'[(type 0, entity 0), (type 1, entity 1), ...]'.
 
         Given types : 
@@ -393,4 +304,4 @@ class NERDemoGeneratorOnline(Label):
             logger.info(f"Save template to {chat_template_file}")
         except Exception as e:
             logger.error(f"Error during saving template: {e}")
-        return prompt
+        return prompt, types_information, demonstrations_str
