@@ -230,7 +230,11 @@ class NERDemoGenerator(Label):
         }
         assert generate_method in sentence_generate_methods, f"generate_method should be in {sentence_generate_methods.keys()}"
 
-        demonstrations_file = os.path.join(self.config.cache_dir, f'{generate_method}_demonstrations.json')
+        demonstrations_file = fu.init_file_path(
+            config=self.config,
+            file_dir=self.config.cache_dir,
+            file_postfix_name=f'demonstrations.json'
+        )
         if os.path.exists(demonstrations_file):
             with open(demonstrations_file, "r", encoding="utf-8") as f:
                 demonstrations = json.load(f)
@@ -249,20 +253,24 @@ class NERDemoGenerator(Label):
             logger.error(f"Error during saving demonstrations: {e}")
         return demonstrations
 
-    def get_prompt(self):
+    def get_prompt(self, setting='few-shot'):
         """
         Get the prompt for the user
+        :param setting: the setting of the annotation, 'few-shot' or 'zero-shot'
         :return:
         """
-        # step1, generate initial entities
-        self.generate_initial_entities()
+        assert setting in {'few-shot', 'zero-shot'}, f"Invalid setting: {setting}, should be one of {'few-shot', 'zero-shot'}"
 
-        # step2, generate demonstrations
-        demonstrations = self.generate_demonstrations(self.config.generate_method)
-        # todo, 这里可以加入lsp方法，
         demonstrations_str = ''
-        for idx, demon in enumerate(demonstrations):
-            demonstrations_str += f'{idx + 1})\n {demon} \n'
+        if setting != 'zero-shot':
+            # step1, generate initial entities
+            self.generate_initial_entities()
+
+            # step2, generate demonstrations
+            demonstrations = self.generate_demonstrations(self.config.generate_method)
+            # todo, 这里可以加入lsp方法，
+            for idx, demon in enumerate(demonstrations):
+                demonstrations_str += f'{idx + 1})\n {demon} \n'
 
         # get type information
         types_information = ''
@@ -271,7 +279,11 @@ class NERDemoGenerator(Label):
             types_information += '{idx}) {type}\n {description}\n'.format(idx=idx + 1, type=type_str, description=description)
 
         # step3, get the prompt
-        chat_template_file = os.path.join(self.config.cache_dir, f'{self.config.generate_method}_template.txt')
+        chat_template_file = fu.init_file_path(
+            config=self.config,
+            file_dir=self.config.cache_dir,
+            file_postfix_name=f'template.txt'
+        )
         if os.path.exists(chat_template_file):
             with open(chat_template_file, "r", encoding="utf-8") as f:
                 prompt = f.read()
@@ -292,11 +304,14 @@ class NERDemoGenerator(Label):
         ### Types
         {types_information}
 
-        Here are some demonstrations to help you understand the task better:
-        ### Demonstrations
-        {demonstrations_str}
-
         """
+        if setting == 'few-shot':
+            prompt += f"""
+            Here are some demonstrations to help you understand the task better:
+            ### Demonstrations
+            {demonstrations_str}
+            
+            """
 
         try:
             with open(chat_template_file, "w", encoding="utf-8") as f:

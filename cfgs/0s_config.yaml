@@ -1,0 +1,25 @@
+# config file for 0-shot annotation
+
+online: True  # online mode or offline mode
+seed: 22
+cache_dir: data/anno_res/0-shot/{dataset}_{seed}  # cache directory to save annotation.py results
+eval_dir: data/eval/0-shot/{dataset}_{seed}  # evaluation results file dir
+des_format: simple  # type description format , 'simple' for simple description, 'full' for full description, 'empty' for no description
+natural_form: True  # natural_form is used to indicate whether the labels are in natural language form.
+
+
+dataset: ???  # the dataset cfg. it's need to be set in 'run.py'
+data_cfg_paths:
+  conll2003: cfgs/dataset/conll2003.yaml  # relative to the 'run.py' file
+  ontonotes5: cfgs/dataset/ontonotes5.yaml
+  mit_restaurant: cfgs/dataset/mit_restaurant.yaml
+  mit_movie: cfgs/dataset/mit_movie.yaml
+#  genia: cfgs/dataset/genia.yml
+
+ner_app:
+  name: 0-shot_ner  # app to ner, '0-shot_ner' 'fs_ner'
+  app_mode: chat
+
+dify_api:
+  base_url: http://localhost/v1
+  0-shot_ner: app-SDS5uCmqmcLLm5wOilhLyedm  # 0-shot ner model app token

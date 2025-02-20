@@ -1,3 +1,4 @@
+import os
 import math
 import random
 import re
@@ -8,6 +9,7 @@ import requests
 import json
 import pandas as pd
 import numpy as np
+from omegaconf import DictConfig
 from collections import Counter
 from yaml import SafeLoader
 from tqdm import tqdm
@@ -409,3 +411,22 @@ def clean_format(message):
     message = re.sub(r'\n', '', message)
     message = re.sub(r"\s+", " ", message)
     return message
+
+def init_file_path(config: DictConfig, file_dir, file_postfix_name):
+    augment_method_postfix = ''
+    max_entities_postfix = ''
+    generate_method_postfix = ''
+    if 'augment_method' in config and config.augment_method is not None:
+        augment_method_postfix = f'-{config.augment_method}'
+    if 'max_entities' in config and config.max_entities is not None:
+        max_entities_postfix = f'-e{config.max_entities}'
+    if 'generate_method' in config and config.generate_method == 'fixed':
+        generate_method_postfix = config.generate_method
+    if ((augment_method_postfix != '' or max_entities_postfix !='' or generate_method_postfix != '')
+            and not file_postfix_name.startswith('_')):
+        file_postfix_name = f'_{file_postfix_name}'
+    file_path = os.path.join(
+        file_dir,
+        f'{generate_method_postfix}{max_entities_postfix}{augment_method_postfix}{file_postfix_name}'
+    )
+    return file_path

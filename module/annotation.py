@@ -89,7 +89,7 @@ class Annotation(Label):
         :return:
         """
         assert 'types_description' in kwargs, "types_description should be provided in zero-shot setting"
-        assert kwargs['types_description'] is None, "types_description should not be empty in zero-shot setting"
+        assert kwargs['types_description'] is not None, "types_description should not be empty in zero-shot setting"
         inputs = {
             "types_description": kwargs['types_description']
         }
@@ -113,14 +113,11 @@ class Annotation(Label):
         :return:
         """
         # 1. init cache file
-        augment_method = ''
-        if self.config.augment_method is not None:
-            augment_method = f'_{self.config.augment_method}'
-        anno_res_cache_file = os.path.join(
-            self.config.cache_dir,
-            f'{self.config.generate_method}{augment_method}_anno_res_cache.json'
+        anno_res_cache_file = fu.init_file_path(
+            config=self.config,
+            file_dir=self.config.cache_dir,
+            file_postfix_name='anno_res_cache.json'
         )
-
         # 2. annotate
         pred_spans, gold_spans = [], []
         if os.path.exists(anno_res_cache_file):
@@ -192,20 +189,15 @@ class Annotation(Label):
 
     def evaluate(self, y_trues, y_preds):
         # 1. init cache file
-        eval_dir = self.config.eval_dir
-        if not os.path.exists(eval_dir):
-            os.makedirs(eval_dir)
-
-        augment_method = ''
-        if self.config.augment_method is not None:
-            augment_method = f'_{self.config.augment_method}'
-        res_file = os.path.join(
-            eval_dir,
-            f'{self.config.generate_method}{augment_method}_res.json'
+        res_file = fu.init_file_path(
+            config=self.config,
+            file_dir=self.config.eval_dir,
+            file_postfix_name='res.json'
         )
-        res_by_class_file = os.path.join(
-            eval_dir,
-            f'{self.config.generate_method}{augment_method}_res_by_class.csv'
+        res_by_class_file = fu.init_file_path(
+            config=self.config,
+            file_dir=self.config.eval_dir,
+            file_postfix_name='res_by_class.csv'
         )
         logger.info(f'saved the evaluation results to {res_file}')
         logger.info(f'saved the evaluation results by class to {res_by_class_file}')
