@@ -420,7 +420,9 @@ def init_file_path(config: DictConfig, file_dir, file_postfix_name):
         augment_method_postfix = f'-{config.augment_method}'
     if 'max_entities' in config and config.max_entities is not None:
         max_entities_postfix = f'-e{config.max_entities}'
-    if 'generate_method' in config and config.generate_method == 'fixed':
+    if 'generate_method' in config and config.generate_method is not None:
+        if config.generate_method == 'fixed':
+            max_entities_postfix = ''
         generate_method_postfix = config.generate_method
     if ((augment_method_postfix != '' or max_entities_postfix !='' or generate_method_postfix != '')
             and not file_postfix_name.startswith('_')):

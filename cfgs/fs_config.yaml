@@ -28,7 +28,7 @@ entity_app:
 sentence_app:
   name: sentence_model  # app to generate sentences
 ner_app:
-  name: 0-shot_ner  # app to ner, '0-shot_ner' 'fs_ner'
+  name: fs_ner  # app to ner, '0-shot_ner' 'fs_ner'
   app_mode: chat
 
 dify_api:
@@ -36,5 +36,4 @@ dify_api:
   intrinsic: app-IW8uh8lopyvzAWFUeTf7RzK4  # intrinsic entity generation app token
   tool_agent: app-OE8Ejn9NUPovAnZ3O3fUW2oL # tool entity generation app token
   sentence_model: app-Xd5u8MT4ragS3G14IquHEv7W  # sentence model(to generate sentence)app token
-  0-shot_ner: app-SDS5uCmqmcLLm5wOilhLyedm  # 0-shot ner model app token
   fs_ner: app-5LfawwuLi2k7QfckVrMXuhJT  # fine-tuned ner model app token

@@ -141,8 +141,10 @@ class Annotation(Label):
                     demonstrations=demonstrations
                 )
                 output_text = fu.clean_format(response)
+                logger.info(f'input: {sentence}')
                 logger.info(f'output: {output_text}')
                 out_spans = self._process_output(output_text, sentence)
+                logger.info(f'out_spans: {out_spans}')
                 # if len(out_spans) == 0:
                 #     continue
                 pred_spans_in_a_query = []
@@ -189,15 +191,18 @@ class Annotation(Label):
 
     def evaluate(self, y_trues, y_preds):
         # 1. init cache file
+        generate_postfix = ''
+        if 'generate_method' in self.config:
+            generate_postfix = f'{self.config.generate_method}_'
         res_file = fu.init_file_path(
             config=self.config,
             file_dir=self.config.eval_dir,
-            file_postfix_name='res.json'
+            file_postfix_name=f'{generate_postfix}res.json'
         )
         res_by_class_file = fu.init_file_path(
             config=self.config,
             file_dir=self.config.eval_dir,
-            file_postfix_name='res_by_class.csv'
+            file_postfix_name=f'{generate_postfix}res_by_class.csv'
         )
         logger.info(f'saved the evaluation results to {res_file}')
         logger.info(f'saved the evaluation results by class to {res_by_class_file}')

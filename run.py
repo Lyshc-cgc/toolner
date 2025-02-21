@@ -6,7 +6,7 @@ from module import NERDemoGenerator, Processor, Annotation
 from module import func_util as fu
 
 logger = fu.get_logger('run')
-max_entities_nums = [3]  # [2, 3, 4, 5], the number of entities in the prompt
+MAX_ENTITIES_NUMS= [3]  # [2, 3, 4, 5], the number of entities in the prompt
 seeds = [22, 32, 42]
 test_size = 200  # the number of test instances
 
@@ -15,6 +15,7 @@ def run_few_shot(cfg: DictConfig):
     k_shots = [1, 5]
     cache_dir = cfg.cache_dir  # backup
     eval_dir = cfg.eval_dir
+    max_entities_nums = [3] if cfg.generate_method == 'fixed' else MAX_ENTITIES_NUMS
     for max_entities in max_entities_nums:
         cfg.max_entities = max_entities
         for dataset_name, dataset_cfg_path in cfg.data_cfg_paths.items():
@@ -81,10 +82,12 @@ def run_zero_shot(cfg: DictConfig):
             # 2. init config
             cfg.seed = seed
             cfg.cache_dir = cache_dir.format(
+                ner_app=cfg.ner_app.name,
                 dataset=dataset_name,
                 seed=seed
             )  # save annotation.py results
             cfg.eval_dir = eval_dir.format(
+                ner_app=cfg.ner_app.name,
                 dataset=dataset_name,
                 seed=seed
             )  # save evaluation results

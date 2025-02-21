@@ -102,10 +102,16 @@ class Processor(Label):
                 # element in gold_spans is in the shape of (str(start), str(end) (excluded), span)
                 # element in gold_spans_tags is tag id
                 # the elements' shape of res_spans_labels is like [(start, end (excluded), gold_mention_span, gold_label)...]
-
-                res_sentences.append(' '.join(raw_tokens))
-                res_tags.append(raw_tags)
-                res_spans_labels.append([(*gs, str(gst)) for gs, gst in zip(gold_spans, gold_spans_labels)])
+                if len(gold_spans_labels) == 0:  # empty instance
+                    # Randomly decide whether to include this instance based on the desired ratio
+                    if random.random() < self.data_config.empty_ration:
+                        res_sentences.append(sent)
+                        res_tags.append(raw_tags)
+                        res_spans_labels.append([(*gs, str(gst)) for gs, gst in zip(gold_spans, gold_spans_labels)])
+                else:
+                    res_sentences.append(sent)
+                    res_tags.append(raw_tags)
+                    res_spans_labels.append([(*gs, str(gst)) for gs, gst in zip(gold_spans, gold_spans_labels)])
             else:  # nested NER
                 sent, raw_tokens, starts, ends, raw_tags = instance
                 # 2.1.1 (optional) get the tag directly from the raw dataset
@@ -113,10 +119,17 @@ class Processor(Label):
                 for start, end, label_id in zip(starts, ends, raw_tags):
                     # end position is excluded
                     gold_spans.append((str(start), str(end), ' '.join(raw_tokens[start: end]), str(label_id)))
+                if len(gold_spans) == 0:  # empty instance
+                    # Randomly decide whether to include this instance based on the desired ratio
+                    if random.random() < self.data_config.empty_ration:
+                        res_sentences.append(sent)
+                        res_tags.append([])
+                        res_spans_labels.append(gold_spans)
+
                 # the elements' shape of res_spans_labels is like [(start, end (excluded), gold_mention_span, gold_label)...]
-                res_spans_labels.append(gold_spans)
-                res_sentences.append(' '.join(raw_tokens))
+                res_sentences.append(sent)
                 res_tags.append([])
+                res_spans_labels.append(gold_spans)
 
         return {
             'sentences': res_sentences,
@@ -147,10 +160,13 @@ class Processor(Label):
             if not self.data_config.nested:
                 # for those flat datasets, we need to filter out those instances with different length of tokens and tags
                 preprocessed_dataset = preprocessed_dataset.filter(lambda x: len(x[tokens_filed]) == len(x[ner_tags_field]) )
-            preprocessed_dataset = preprocessed_dataset.map(process_func,
-                                                            batched=True,
-                                                            batch_size=self.data_config.data_batch_size,
-                                                            num_proc=self.data_config.num_proc)
+            preprocessed_dataset = preprocessed_dataset.map(
+                process_func,
+                batched=True,
+                batch_size=self.data_config.data_batch_size,
+                num_proc=self.data_config.num_proc,
+                remove_columns=preprocessed_dataset['train'].column_names
+            )
             # add index column
             preprocessed_dataset = preprocessed_dataset.map(lambda example, index: {"id": index}, with_indices=True)  # add index column
 
