@@ -7,9 +7,11 @@ cache_dir: data/anno_res/{entity_app}/{dataset}_{k_shot}-shot_{seed}  # cache di
 eval_dir: data/eval/{entity_app}/{dataset}_{k_shot}-shot_{seed}  # evaluation results file dir
 des_format: simple  # type description format , 'simple' for simple description, 'full' for full description, 'empty' for no description
 natural_form: True  # natural_form is used to indicate whether the labels are in natural language form.
-generate_method: combined  # fixed, combined
+generate_method: fixed  # fixed, combined
 max_entities: 3  # max number of entities in a sentence
 augment_method: # None, 'lsp'
+subset_size: 0.5
+partition_time: 1
 
 dataset: ???  # the dataset cfg. it's need to be set in 'run.py'
 data_cfg_paths:
@@ -28,7 +30,7 @@ entity_app:
 sentence_app:
   name: sentence_model  # app to generate sentences
 ner_app:
-  name: fs_ner  # app to ner, '0-shot_ner' 'fs_ner'
+  name: fs_ner  # app to ner, 'fs_ner'
   app_mode: chat
 
 dify_api:

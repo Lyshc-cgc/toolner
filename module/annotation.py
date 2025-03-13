@@ -191,18 +191,15 @@ class Annotation(Label):
 
     def evaluate(self, y_trues, y_preds):
         # 1. init cache file
-        generate_postfix = ''
-        if 'generate_method' in self.config:
-            generate_postfix = f'{self.config.generate_method}_'
         res_file = fu.init_file_path(
             config=self.config,
             file_dir=self.config.eval_dir,
-            file_postfix_name=f'{generate_postfix}res.json'
+            file_postfix_name=f'res.json'
         )
         res_by_class_file = fu.init_file_path(
             config=self.config,
             file_dir=self.config.eval_dir,
-            file_postfix_name=f'{generate_postfix}res_by_class.csv'
+            file_postfix_name=f'res_by_class.csv'
         )
         logger.info(f'saved the evaluation results to {res_file}')
         logger.info(f'saved the evaluation results by class to {res_by_class_file}')

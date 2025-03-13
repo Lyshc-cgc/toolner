@@ -231,6 +231,8 @@ def find_span(text: str, span: str):
     re_span = re.escape(str(span))  # escape special characters in the span
     pattern_0 = r"\b(" + re_span + r")\b"  # match the whole span after escaping special characters
     pattern_1 = r"\s(" + re_span + r")\s"  # match the span surrounded by spaces after escaping special characters
+    # pattern_2 = r"\b(" + re_span.lower() + r")\b"
+    # pattern_3 = r"\s(" + re_span.lower() + r")\s"
     patterns = [pattern_0, pattern_1]
     res_matches = []
     for pattern in patterns:
@@ -250,12 +252,12 @@ def find_span(text: str, span: str):
 
     return res_spans
 
-def get_label_subsets(labels, sub_size, repeat_num=1, fixed_subsets=None):
+def get_label_subsets(labels, sub_size, partition_time=1, fixed_subsets=None):
     """
     Get the subsets of the labels.
     :param labels: list, the list of labels.
     :param sub_size: int or float (<1), the size of the label subset.
-    :param repeat_num: the number of times to repeat each label.
+    :param partition_time: the number of times to partition each label.
     :param fixed_subsets: a list of lists or tuples, the fixed subsets. we randomly sample the rest of the labels. e.g., [['PER', 'ORG'], ['LOC', 'GPE'],...]
     :return: list, the list of subsets.
     """
@@ -265,7 +267,7 @@ def get_label_subsets(labels, sub_size, repeat_num=1, fixed_subsets=None):
             sub_size = 1
 
     label_subsets = []
-    for _ in range(repeat_num):
+    for _ in range(partition_time):
         random.shuffle(labels)
         if fixed_subsets:
             labels = [l for l in labels if l not in fixed_subsets]  # filter out labels in the fixed subsets
@@ -344,13 +346,6 @@ def request_dify_chat(base_url,
         "response_mode": response_mode,
         "conversation_id": "",
         "user": "abc-123",
-        # "files": [
-        #     {
-        #         "type": "image",
-        #         "transfer_method": "remote_url",
-        #         "url": "https://cloud.dify.ai/logo/logo-site.png"
-        #     }
-        # ]
     }
     stream_flag = True if response_mode == "streaming" else False
     response = requests.post(url, headers=headers, json=data, stream=stream_flag)
