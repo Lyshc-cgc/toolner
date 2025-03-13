@@ -1,17 +1,11 @@
-# config for few-shot annotation
+# config for getting hypernyms distribution of entities
 
 online: True  # online mode or offline mode
-k_shot: 1   # 5. it indicates the number of initial entities for each type
-seed: 22
-cache_dir: data/anno_res/{entity_app}/{dataset}_{k_shot}-shot_{seed}  # cache directory to save annotation.py results
-eval_dir: data/eval/{entity_app}/{dataset}_{k_shot}-shot_{seed}  # evaluation results file dir
+num_entities: 200  # number of entities to be generated
+cache_dir: data/anno_res/entity_distribution  # cache directory to save annotation.py results
+eval_dir: data/eval/entity_distribution  # evaluation results file dir
 des_format: simple  # type description format , 'simple' for simple description, 'full' for full description, 'empty' for no description
 natural_form: True  # natural_form is used to indicate whether the labels are in natural language form.
-generate_method: fixed  # fixed, combined
-max_entities: 3  # max number of entities in a sentence
-augment_method: # None, 'lsp'
-subset_size: 0.5
-partition_time: 1
 
 dataset: ???  # the dataset cfg. it's need to be set in 'run.py'
 data_cfg_paths:
@@ -20,22 +14,17 @@ data_cfg_paths:
   mit_restaurant: cfgs/dataset/mit_restaurant.yaml
   mit_movie: cfgs/dataset/mit_movie.yaml
 
-#  genia: cfgs/dataset/genia.yml
 
 # dify_cfg:
 entity_app:
   name: tool_agent  # app to generate entities, 'intrinsic' (other), 'tool_agent' (agent)
   app_mode: agent
-
-sentence_app:
-  name: sentence_model  # app to generate sentences
-ner_app:
-  name: fs_ner  # app to ner, 'fs_ner'
-  app_mode: chat
+hypernyms_app:
+  name: hypernyms_agent  # app to get entities' hypernyms
+  app_mode: agent
 
 dify_api:
   base_url: http://localhost/v1
+  hypernyms_agent: app-UBKVJ3lOZetjITpb3e1szwwI
   intrinsic: app-IW8uh8lopyvzAWFUeTf7RzK4  # intrinsic entity generation app token
   tool_agent: app-OE8Ejn9NUPovAnZ3O3fUW2oL # tool entity generation app token
-  sentence_model: app-Xd5u8MT4ragS3G14IquHEv7W  # sentence model(to generate sentence)app token
-  fs_ner: app-5LfawwuLi2k7QfckVrMXuhJT  # fine-tuned ner model app token
