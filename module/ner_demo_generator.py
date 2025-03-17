@@ -475,18 +475,32 @@ class NERDemoGenerator(Label):
             cache_dir = os.path.join(self.config.cache_dir, self.config.entity_app.name)
         hypernyms_file = os.path.join(cache_dir, f'{self.config.dataset.dataset_name}_{entity_source}_hypernyms.json')
         logger.info(f'hypernyms_file: {hypernyms_file}')
+
+        cached_flags = [False] * len(self.entity_types)
         if os.path.exists(hypernyms_file):
             try:
                 with open(hypernyms_file, "r", encoding="utf-8") as f:
-                    hypernyms = json.load(f)
+                    cached_hypernyms = json.load(f)
                 logger.info(f"Cached hypernyms found! Load hypernyms from {hypernyms_file}")
-                return hypernyms
+                for idx, entity_type in enumerate(self.entity_types):
+                    if entity_type in cached_hypernyms:
+                        cached_flags[idx] = True
             except Exception as e:
                 logger.error(f"Error during loading hypernyms: {e}")
 
+        if all(cached_flags):  # there are cached hypernyms for all entity types
+            return cached_hypernyms
+
         # 2. no cached file. generate hypernyms from scratch
+        logger.info("Start to get hypernyms from Dify API")
         hypernyms = {}
-        for entity_type in self.entity_types:
+        for idx, entity_type in enumerate(self.entity_types):
+            logger.info(f"Get hypernyms for entity type: {entity_type}")
+            if cached_flags[idx]:
+                hypernyms[entity_type] = cached_hypernyms[entity_type]
+                logger.info(f"Use cached hypernyms for entity type: {entity_type}")
+                continue
+            logger.info(f"None cached hypernyms. Generate hypernyms for entity type: {entity_type}")
             hypernyms[entity_type] = []
             for batched_entities in tqdm(itertools.batched(entities[entity_type], 2), total=len(entities[entity_type]) // 2):
                 retry_num = 10
@@ -520,13 +534,14 @@ class NERDemoGenerator(Label):
                                      f'Response: {response} \n')
                         retry_num -= 1
 
-        # 3. cache hypernyms to file
-        try:
-            with open(hypernyms_file, "w", encoding="utf-8") as f:
-                json.dump(hypernyms, f, ensure_ascii=False, indent=4)
-            logger.info(f"Save hypernyms to {hypernyms_file}")
-        except Exception as e:
-            logger.error(f"Error during saving hypernyms: {e}")
+            # 3. cache hypernyms to file after processing each entity type
+            try:
+                with open(hypernyms_file, "w", encoding="utf-8") as f:
+                    json.dump(hypernyms, f, ensure_ascii=False, indent=4)
+                logger.info(f"Save hypernyms to {hypernyms_file}")
+            except Exception as e:
+                logger.error(f"Error during saving hypernyms: {e}")
+
         return hypernyms
 
     def get_entity_hypernyms_dist(self, dataset=None, entity_source='generate'):
